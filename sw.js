@@ -1,8 +1,8 @@
 /* Offline support: the app opens instantly from the phone's copy. A new version is
    downloaded in the background and the app reloads into it when no workout is running.
    Google Sheet calls are never cached. */
-const CACHE = 'bt-v28';
-const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+const CACHE = 'bt-v29';
+const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'privacy.html'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
