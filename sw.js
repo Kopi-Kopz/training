@@ -1,8 +1,10 @@
 /* Offline support: the app opens instantly from the phone's copy. A new version is
    downloaded in the background and the app reloads into it when no workout is running.
-   Google Sheet calls are never cached. */
-const CACHE = 'bt-v29';
-const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'privacy.html'];
+   Google Sheet calls are never cached. Each app (folder) keeps its own cache, so two
+   apps on the same site never delete each other's files. */
+const APP = (new URL(self.registration.scope).pathname.replace(/[^a-z0-9]/gi, '') || 'app').toLowerCase();
+const CACHE = APP + '-v30';
+const ASSETS = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -12,7 +14,7 @@ self.addEventListener('message', e => { if (e.data === 'skip') self.skipWaiting(
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => (k.startsWith(APP + '-') && k !== CACHE) || /^bt-v\d+$/.test(k)).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
