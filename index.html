@@ -348,7 +348,7 @@ const S = {
 
 /* ---------- server bridge ---------- */
 /* The app talks to your Apps Script over HTTPS. URL + key are stored only on this phone. */
-const APP_VERSION = '30';
+const APP_VERSION = '31';
 const apiCfg = () => LS.get('bt.api', null);
 const hasGAS = () => { const c = apiCfg(); return !!(c && c.url && c.key); };
 const ACTIONS = { getBootstrap: 'bootstrap', syncOps: 'syncOps', saveWeight: 'saveWeight', syncFood: 'syncFood', savePlan: 'savePlan', ping: 'ping' };
@@ -412,7 +412,7 @@ function mergeWeights(server) {
 function weightGoal() {
   const g = infoNum('Goal weight') != null ? infoNum('Goal weight') : CFG.weightGoal && CFG.weightGoal.goal;
   const st = infoNum('Start weight') != null ? infoNum('Start weight') : CFG.weightGoal && CFG.weightGoal.start;
-  return g != null && st != null && st !== g ? { start: st, goal: g } : null;
+  return g != null && st != null && st !== g ? { start: st, goal: g, gain: g > st } : null;
 }
 function weightChange(days) {
   const W = S.weights; if (W.length < 2) return null;
@@ -1430,7 +1430,7 @@ function renderToday() {
     return `<div class="${cls}"><div class="dn">${DAYS[d.getDay()].slice(0, 2)}</div><div class="dd">${d.getDate()}</div><div class="mk"></div></div>`;
   }).join('');
 
-  const toGo = lw != null && wg ? lw - goal : null;
+  const toGo = lw != null && wg ? (wg.gain ? goal - lw : lw - goal) : null;
   const pct = lw != null && wg ? Math.max(0, Math.min(100, (start - lw) / (start - goal) * 100)) : 0;
   const ch = weightChange(7);
   const weighedToday = S.weights.some(w => w.date === today());
@@ -1670,9 +1670,13 @@ function renderBody() {
       const perWeek = slope * 7;
       const cur = avg[avg.length - 1][1];
       let eta = '';
-      if (wg && perWeek < -0.05 && cur > goal) { const wk = (cur - goal) / -perWeek; const d = new Date(); d.setDate(d.getDate() + wk * 7); eta = ` · goal around <b>${d.getDate()} ${MONTHS[d.getMonth()]}</b>`; }
-      const tone = !wg ? (Math.abs(perWeek) < 0.15 ? 'Stable.' : perWeek > 0 ? 'Trending up.' : 'Trending down.') : perWeek < -1 ? 'Fast — make sure training quality holds.' : perWeek < -0.25 ? 'Right on track.' : perWeek <= 0.1 ? 'Flat — tighten sweets & steps a bit.' : 'Trending up.';
-      rateTxt = `<div class="coach ${wg && perWeek < -0.25 && perWeek >= -1 ? '' : 'neutral'}"><span>📉</span><div><b class="num">${perWeek > 0 ? '+' : ''}${perWeek.toFixed(2)} kg/week</b> over 4 weeks${eta}. ${tone}</div></div>`;
+      if (wg && wg.gain && perWeek > 0.05 && cur < goal) { const wk = (goal - cur) / perWeek; const d = new Date(); d.setDate(d.getDate() + wk * 7); eta = ` · goal around <b>${d.getDate()} ${MONTHS[d.getMonth()]}</b>`; }
+      if (wg && !wg.gain && perWeek < -0.05 && cur > goal) { const wk = (cur - goal) / -perWeek; const d = new Date(); d.setDate(d.getDate() + wk * 7); eta = ` · goal around <b>${d.getDate()} ${MONTHS[d.getMonth()]}</b>`; }
+      const onTrack = wg && (wg.gain ? perWeek > 0.1 && perWeek <= 0.5 : perWeek < -0.25 && perWeek >= -1);
+      const tone = !wg ? (Math.abs(perWeek) < 0.15 ? 'Stable.' : perWeek > 0 ? 'Trending up.' : 'Trending down.')
+        : wg.gain ? (perWeek > 0.5 ? 'Fast — slower gains stay lean.' : perWeek > 0.1 ? 'Right on track.' : perWeek >= -0.1 ? 'Flat — add a snack on training days.' : 'Trending down — eat a bit more.')
+        : perWeek < -1 ? 'Fast — make sure training quality holds.' : perWeek < -0.25 ? 'Right on track.' : perWeek <= 0.1 ? 'Flat — tighten sweets & steps a bit.' : 'Trending up.';
+      rateTxt = `<div class="coach ${onTrack ? '' : 'neutral'}"><span>${perWeek > 0.05 ? '📈' : perWeek < -0.05 ? '📉' : '➖'}</span><div><b class="num">${perWeek > 0 ? '+' : ''}${perWeek.toFixed(2)} kg/week</b> over 4 weeks${eta}. ${tone}</div></div>`;
     }
   }
   const pct = lw != null && wg ? Math.max(0, Math.min(100, (start - lw) / (start - goal) * 100)) : 0;
@@ -1688,7 +1692,7 @@ function renderBody() {
 
   $('#app').innerHTML = header('Body', wg ? `Goal ${fmtKg(goal)} kg` : 'Weight') + (wg ? `
     <div class="card"><div class="row between"><div class="stat"><div class="l">Current</div><div class="v num" style="font-size:34px">${lw != null ? fmtKg(lw) : '–'}<span class="small muted"> kg</span></div></div>
-      <div class="stat" style="text-align:right"><div class="l">Lost so far</div><div class="v num" style="color:var(--acc)">${lw != null ? fmtKg(Math.max(0, start - lw)) : '–'}<span class="small muted"> kg</span></div></div></div>
+      <div class="stat" style="text-align:right"><div class="l">${wg.gain ? 'Gained so far' : 'Lost so far'}</div><div class="v num" style="color:var(--acc)">${lw != null ? fmtKg(Math.max(0, wg.gain ? lw - start : start - lw)) : '–'}<span class="small muted"> kg</span></div></div></div>
       <div class="bar mt"><i style="width:${pct}%"></i></div><div class="row between tiny dim mt"><span>${fmtKg(start)} kg start</span><span>${Math.round(pct)}%</span><span>${fmtKg(goal)} kg goal</span></div></div>` : `
     <div class="card"><div class="row between"><div class="stat"><div class="l">Current</div><div class="v num" style="font-size:34px">${lw != null ? fmtKg(lw) : '–'}<span class="small muted"> kg</span></div></div>
       <div class="stat" style="text-align:right"><div class="l">4 weeks</div><div class="v num">${ch28 ? (ch28.d > 0 ? '+' : '') + ch28.d.toFixed(1) : '–'}<span class="small muted"> kg</span></div></div></div>

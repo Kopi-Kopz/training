@@ -3,7 +3,7 @@
    Google Sheet calls are never cached. Each app (folder) keeps its own cache, so two
    apps on the same site never delete each other's files. */
 const APP = (new URL(self.registration.scope).pathname.replace(/[^a-z0-9]/gi, '') || 'app').toLowerCase();
-const CACHE = APP + '-v30';
+const CACHE = APP + '-v31';
 const ASSETS = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
